@@ -79,7 +79,7 @@
 	"Point Select Panel"
 	{
 		"#format"		"{1:s}"
-		"fr"			"Veuillez restez immobile dans la zone ({1}),\net appuyez sur TIR SECONDAIRE (Défaut : Clique droit de la souris)."
+		"fr"			"Veuillez restez immobile dans le {1} point,\net appuyez sur TIR SECONDAIRE (Défaut : Clique droit de la souris)."
 	}
 	
 	"Tier"
