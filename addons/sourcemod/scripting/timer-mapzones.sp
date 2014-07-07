@@ -139,7 +139,9 @@ new precache_laser_bonus_start;
 new precache_laser_end;
 new precache_laser_start;
 
-new g_clientLevel[MAXPLAYERS+1]=0;
+new g_iClientLastTrackZone[MAXPLAYERS+1]=0;
+
+new Handle:g_OnMapZonesLoaded;
 
 new Handle:g_OnClientStartTouchZoneType;
 new Handle:g_OnClientEndTouchZoneType;
@@ -282,6 +284,8 @@ public OnPluginStart()
 	AddNormalSoundHook(Hook_NormalSound);
 	
 	g_ioffsCollisionGroup = FindSendPropOffs("CBaseEntity", "m_CollisionGroup");
+	
+	g_OnMapZonesLoaded = CreateGlobalForward("OnMapZonesLoaded", ET_Event);
 	
 	g_OnClientStartTouchZoneType = CreateGlobalForward("OnClientStartTouchZoneType", ET_Event, Param_Cell,Param_Cell);
 	g_OnClientEndTouchZoneType = CreateGlobalForward("OnClientEndTouchZoneType", ET_Event, Param_Cell,Param_Cell);
@@ -516,7 +520,7 @@ public Action:StartTouchTrigger(caller, activator)
 		if(mate == 0)
 		{
 			g_iIgnoreEndTouchStart[client] = false;
-			g_clientLevel[client] = zone;
+			g_iClientLastTrackZone[client] = zone;
 			
 			Timer_Stop(client, false);
 			Timer_SetTrack(client, TRACK_NORMAL);
@@ -525,7 +529,7 @@ public Action:StartTouchTrigger(caller, activator)
 	else if (g_mapZones[zone][Type] == ZtBonusStart)
 	{
 		g_iIgnoreEndTouchStart[client] = false;
-		g_clientLevel[client] = zone;
+		g_iClientLastTrackZone[client] = zone;
 		
 		Timer_Stop(client, false);
 		Timer_SetTrack(client, TRACK_BONUS);
@@ -546,7 +550,7 @@ public Action:StartTouchTrigger(caller, activator)
 			}
 			else if(Timer_GetTrack(client) == TRACK_NORMAL)
 			{
-				g_clientLevel[client] = zone;
+				g_iClientLastTrackZone[client] = zone;
 				
 				if (Timer_Stop(client, false))
 				{
@@ -578,7 +582,7 @@ public Action:StartTouchTrigger(caller, activator)
 			}
 			else if(Timer_GetTrack(client) == TRACK_NORMAL)
 			{
-				g_clientLevel[client] = zone;
+				g_iClientLastTrackZone[client] = zone;
 				
 				new bool:enabled = false;
 				new jumps = 0;
@@ -607,7 +611,7 @@ public Action:StartTouchTrigger(caller, activator)
 			}
 			else if(Timer_GetTrack(client) == TRACK_BONUS)
 			{
-				g_clientLevel[client] = zone;
+				g_iClientLastTrackZone[client] = zone;
 				
 				if (Timer_Stop(client, false))
 				{
@@ -659,11 +663,11 @@ public Action:StartTouchTrigger(caller, activator)
 	}
 	else if (g_mapZones[zone][Type] == ZtLast)
 	{
-		new lowestcheckpoint = g_mapZones[g_clientLevel[client]][Level_Id];
+		new lowestcheckpoint = g_mapZones[g_iClientLastTrackZone[client]][Level_Id];
 		
 		if(0 < mate && IsClientInGame(mate) && IsPlayerAlive(mate)) 
 		{
-			if(g_clientLevel[client] > g_clientLevel[mate]) lowestcheckpoint = g_mapZones[g_clientLevel[mate]][Level_Id];
+			if(g_iClientLastTrackZone[client] > g_iClientLastTrackZone[mate]) lowestcheckpoint = g_mapZones[g_iClientLastTrackZone[mate]][Level_Id];
 			
 			Tele_Level(client, lowestcheckpoint);
 			Tele_Level(mate, lowestcheckpoint);
@@ -679,16 +683,16 @@ public Action:StartTouchTrigger(caller, activator)
 	}
 	else if (g_mapZones[zone][Type] == ZtNext)
 	{
-		if(0 < mate && IsClientInGame(mate) && IsPlayerAlive(mate) && g_mapZones[g_clientLevel[client]][Level_Id] == g_mapZones[g_clientLevel[mate]][Level_Id])
+		if(0 < mate && IsClientInGame(mate) && IsPlayerAlive(mate) && g_mapZones[g_iClientLastTrackZone[client]][Level_Id] == g_mapZones[g_iClientLastTrackZone[mate]][Level_Id])
 		{
-			Tele_Level(client, g_mapZones[g_clientLevel[client]][Level_Id]+1);
-			Tele_Level(mate, g_mapZones[g_clientLevel[client]][Level_Id]+1);
+			Tele_Level(client, g_mapZones[g_iClientLastTrackZone[client]][Level_Id]+1);
+			Tele_Level(mate, g_mapZones[g_iClientLastTrackZone[client]][Level_Id]+1);
 			if(Client_IsValid(client, true)) EmitSoundToClient(client, SND_TELE_NEXT);
 			if(Client_IsValid(mate, true)) EmitSoundToClient(mate, SND_TELE_NEXT);
 		}
 		else
 		{
-			Tele_Level(client, g_mapZones[g_clientLevel[client]][Level_Id]+1);
+			Tele_Level(client, g_mapZones[g_iClientLastTrackZone[client]][Level_Id]+1);
 			if(Client_IsValid(client, true)) EmitSoundToClient(client, SND_TELE_NEXT);
 		}
 		
@@ -697,12 +701,12 @@ public Action:StartTouchTrigger(caller, activator)
 	{
 		if(Timer_GetTrack(client) == TRACK_NORMAL)
 		{
-			new lastlevel = g_mapZones[g_clientLevel[client]][Level_Id];
-			g_clientLevel[client] = zone;
+			new lastlevel = g_mapZones[g_iClientLastTrackZone[client]][Level_Id];
+			g_iClientLastTrackZone[client] = zone;
 			
 			Call_StartForward(g_OnClientStartTouchLevel);
 			Call_PushCell(client);
-			Call_PushCell(g_mapZones[g_clientLevel[client]][Level_Id]);
+			Call_PushCell(g_mapZones[g_iClientLastTrackZone[client]][Level_Id]);
 			Call_PushCell(lastlevel);
 			Call_Finish();
 		}
@@ -711,12 +715,12 @@ public Action:StartTouchTrigger(caller, activator)
 	{
 		if(Timer_GetTrack(client) == TRACK_BONUS)
 		{
-			new lastlevel = g_mapZones[g_clientLevel[client]][Level_Id];
-			g_clientLevel[client] = zone;
+			new lastlevel = g_mapZones[g_iClientLastTrackZone[client]][Level_Id];
+			g_iClientLastTrackZone[client] = zone;
 			
 			Call_StartForward(g_OnClientStartTouchBonusLevel);
 			Call_PushCell(client);
-			Call_PushCell(g_mapZones[g_clientLevel[client]][Level_Id]);
+			Call_PushCell(g_mapZones[g_iClientLastTrackZone[client]][Level_Id]);
 			Call_PushCell(lastlevel);
 			Call_Finish();
 		}
@@ -902,7 +906,7 @@ public Action:NPC_Use(caller, activator)
 	{
 		if(g_mapZones[i][NPC] == caller)
 		{
-			g_clientLevel[activator] = i;
+			g_iClientLastTrackZone[activator] = i;
 			
 			Menu_NPC_Next(activator, i);
 			
@@ -1007,7 +1011,7 @@ public OnMapStart()
 	
 	for (new i = 1; i < MAXPLAYERS; i++)
 	{
-		g_clientLevel[i] = 0;
+		g_iClientLastTrackZone[i] = 0;
 	}
 	
 	PrecacheModel("models/props_junk/wood_crate001a.mdl", true);
@@ -1128,7 +1132,7 @@ public Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	
-	g_clientLevel[client] = 0;
+	g_iClientLastTrackZone[client] = 0;
 	g_iIgnoreEndTouchStart[client] = 0;
 	g_iTargetNPC[client] = 0;
 	Timer_Resume(client);
@@ -1325,6 +1329,10 @@ public LoadMapZonesCallback(Handle:owner, Handle:hndl, const String:error[], any
 	}
 	
 	g_bZonesLoaded = true;
+	
+	/* Forwards */
+	Call_StartForward(g_OnMapZonesLoaded);
+	Call_Finish();
 }
 
 ConnectSQL()
@@ -2169,7 +2177,7 @@ public ZoneTypeSelect(Handle:menu, MenuAction:action, client, itemNum)
 
 stock TeleLastCheckpoint(client)
 {
-	Tele_Level(client, g_mapZones[g_clientLevel[client]][Level_Id]);
+	Tele_Level(client, g_mapZones[g_iClientLastTrackZone[client]][Level_Id]);
 }
 
 stock CheckIllegalTeleport(client)
@@ -3248,13 +3256,13 @@ Menu_NPC_Next(client, zone)
 		}
 		else
 		{
-			if(g_clientLevel[client] > 0 && client > 0 && g_bZonesLoaded)
+			if(g_iClientLastTrackZone[client] > 0 && client > 0 && g_bZonesLoaded)
 			{
 				new Float:velStop[3];
 				new Float:vecDestination[3];
-				vecDestination[0] = g_mapZones[g_clientLevel[client]][Point2][0];
-				vecDestination[1] = g_mapZones[g_clientLevel[client]][Point2][1];
-				vecDestination[2] = g_mapZones[g_clientLevel[client]][Point2][2];
+				vecDestination[0] = g_mapZones[g_iClientLastTrackZone[client]][Point2][0];
+				vecDestination[1] = g_mapZones[g_iClientLastTrackZone[client]][Point2][1];
+				vecDestination[2] = g_mapZones[g_iClientLastTrackZone[client]][Point2][2];
 				
 				if(Timer_IsPlayerTouchingZoneType(client, ZtStart)) Timer_SetIgnoreEndTouchStart(client, 1);
 				
@@ -3295,13 +3303,13 @@ public Handle_Menu_NPC_Next(Handle:menu, MenuAction:action, client, itemNum)
 		{
 			if(StrEqual(info, "yes"))
 			{
-				if(g_clientLevel[client] > 0 && client > 0 && g_bZonesLoaded)
+				if(g_iClientLastTrackZone[client] > 0 && client > 0 && g_bZonesLoaded)
 				{
 					new Float:velStop[3];
 					new Float:vecDestination[3];
-					vecDestination[0] = g_mapZones[g_clientLevel[client]][Point2][0];
-					vecDestination[1] = g_mapZones[g_clientLevel[client]][Point2][1];
-					vecDestination[2] = g_mapZones[g_clientLevel[client]][Point2][2];
+					vecDestination[0] = g_mapZones[g_iClientLastTrackZone[client]][Point2][0];
+					vecDestination[1] = g_mapZones[g_iClientLastTrackZone[client]][Point2][1];
+					vecDestination[2] = g_mapZones[g_iClientLastTrackZone[client]][Point2][2];
 					
 					if(Timer_IsPlayerTouchingZoneType(client, ZtStart)) Timer_SetIgnoreEndTouchStart(client, 1);
 					
@@ -3473,9 +3481,9 @@ public Action:Command_LevelName(client, args)
 		decl String:name2[64];
 		GetCmdArg(1,name2,sizeof(name2));
 		decl String:query[256];
-		FormatEx(query, sizeof(query), "UPDATE mapzone SET name = '%s' WHERE id = %d", name2, g_mapZones[g_clientLevel[client]][Id]);
+		FormatEx(query, sizeof(query), "UPDATE mapzone SET name = '%s' WHERE id = %d", name2, g_mapZones[g_iClientLastTrackZone[client]][Id]);
 		SQL_TQuery(g_hSQL, UpdateLevelCallback, query, client, DBPrio_Normal);	
-		PrintToChat(client, "Set LevelName: %s for ZoneID: %d", name2, g_mapZones[g_clientLevel[client]][Id]);
+		PrintToChat(client, "Set LevelName: %s for ZoneID: %d", name2, g_mapZones[g_iClientLastTrackZone[client]][Id]);
 	}
 	return Plugin_Handled;	
 }
@@ -3493,9 +3501,9 @@ public Action:Command_LevelID(client, args)
 		GetCmdArg(1, name2, sizeof(name2));
 		
 		decl String:query2[512];
-		FormatEx(query2, sizeof(query2), "UPDATE mapzone SET level_id = '%s' WHERE id = %d", name2, g_mapZones[g_clientLevel[client]][Id]);
+		FormatEx(query2, sizeof(query2), "UPDATE mapzone SET level_id = '%s' WHERE id = %d", name2, g_mapZones[g_iClientLastTrackZone[client]][Id]);
 		SQL_TQuery(g_hSQL, UpdateLevelCallback, query2, client, DBPrio_Normal);	
-		PrintToChat(client, "Set LevelID: %s for ZoneID: %d", name2, g_mapZones[g_clientLevel[client]][Id]);
+		PrintToChat(client, "Set LevelID: %s for ZoneID: %d", name2, g_mapZones[g_iClientLastTrackZone[client]][Id]);
 	}
 	return Plugin_Handled;	
 }
@@ -3513,9 +3521,9 @@ public Action:Command_LevelType(client, args)
 		GetCmdArg(1, name2, sizeof(name2));
 		
 		decl String:query2[512];
-		FormatEx(query2, sizeof(query2), "UPDATE mapzone SET type = '%s' WHERE id = %d", name2, g_mapZones[g_clientLevel[client]][Id]);
+		FormatEx(query2, sizeof(query2), "UPDATE mapzone SET type = '%s' WHERE id = %d", name2, g_mapZones[g_iClientLastTrackZone[client]][Id]);
 		SQL_TQuery(g_hSQL, UpdateLevelCallback, query2, client, DBPrio_Normal);	
-		PrintToChat(client, "Set Type: %s for ZoneID: %d", name2, g_mapZones[g_clientLevel[client]][Id]);
+		PrintToChat(client, "Set Type: %s for ZoneID: %d", name2, g_mapZones[g_iClientLastTrackZone[client]][Id]);
 	}
 	return Plugin_Handled;	
 }
@@ -3950,20 +3958,20 @@ public Native_ClientTeleportLevel(Handle:plugin, numParams)
 
 public Native_GetClientLevel(Handle:plugin, numParams)
 {
-	return g_clientLevel[GetNativeCell(1)];
+	return g_iClientLastTrackZone[GetNativeCell(1)];
 }
 
 public Native_SetClientLevel(Handle:plugin, numParams)
 {
-	g_clientLevel[GetNativeCell(1)] = GetNativeCell(2);
+	g_iClientLastTrackZone[GetNativeCell(1)] = GetNativeCell(2);
 }
 
 public Native_GetClientLevelID(Handle:plugin, numParams)
 {
 	new client = GetNativeCell(1);
-	if(client && Client_IsValid(client, true) && g_clientLevel[client] >= 0 && g_clientLevel[client] > 0)
+	if(client && Client_IsValid(client, true) && g_iClientLastTrackZone[client] >= 0 && g_iClientLastTrackZone[client] > 0)
 	{
-		return g_mapZones[g_clientLevel[client]][Level_Id];
+		return g_mapZones[g_iClientLastTrackZone[client]][Level_Id];
 	}
 	else return 0;
 }

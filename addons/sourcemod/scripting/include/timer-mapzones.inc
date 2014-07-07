@@ -6,7 +6,7 @@
 //Levels
 #define LEVEL_START					1
 #define LEVEL_END					999
-#define LEVEL_BONUS_START			1000
+#define LEVEL_BONUS_START			1001
 #define LEVEL_BONUS_END				1999
 
 // 38 zones types
@@ -56,6 +56,13 @@ enum MapZoneType
 }
 
 /* Forwards */
+
+/**
+ * Called when all zones are loaded from the database.
+ *
+ * @noreturn
+ */
+forward OnMapZonesLoaded();
 
 /**
  * Called when a client enters a zone.
